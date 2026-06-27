@@ -25,15 +25,19 @@
 6. 响应头 `Cache-Control: s-maxage=900, stale-while-revalidate=3600`，
    Vercel CDN 缓存约 15 分钟，避免每次打开都打上游，稳稳待在免费额度内。
 
-## 数据源（API-Football / api-sports.io）
+## 数据源（football-data.org）
 
-- 免费档每天 100 次请求；配合上面的 CDN 缓存绰绰有余。
-- 世界杯参数：`league=1`、`season=2026`。
-- 淘汰赛 round 名称（用 `GET /fixtures/rounds?league=1&season=2026` 可列出）：
-  `Round of 32` / `Round of 16` / `Quarter-finals` / `Semi-finals` /
-  `3rd Place Final` / `Final`。
+- 免费档（Free Tier）**就包含 FIFA 世界杯（竞赛代码 `WC`）**，且不限制赛季年份；
+  限速 10 次/分钟，配合上面的 CDN 缓存绰绰有余。
+- 注册拿 token：<https://www.football-data.org/client/register>，把 token 填进
+  环境变量 `FOOTBALL_API_KEY`。请求头用 `X-Auth-Token`。
+- 世界杯参数：`competition=WC`、`season=2026`。
+- 淘汰赛 `match.stage` 取值：`LAST_32` / `LAST_16` / `QUARTER_FINALS` /
+  `SEMI_FINALS` / `THIRD_PLACE` / `FINAL`（小组赛是 `GROUP_STAGE`，自动忽略）。
 - 换源只需改 `api/knockout.js` 顶部的 `API_CONFIG`（地址 / 请求头 / 字段映射 /
-  round→stage 映射都集中在那里，已加注释）。
+  stage→中文 映射都集中在那里，已加注释）。
+- > 备注：本来用 API-Football(api-sports.io)，但其免费档只给 2022–2024 赛季、
+  > 拿不到 2026 世界杯，故改用 football-data.org。
 
 ## 本地开发
 

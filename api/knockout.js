@@ -15,65 +15,57 @@ const SKELETON = require("../knockout-skeleton.json");
 // ───────────────────────────── API_CONFIG ──────────────────────────────────
 //  换数据源时，基本只改这一块。
 //
-//  默认源：API-Football (api-sports.io) —— 免费档每天 100 次请求。
+//  默认源：football-data.org (v4) —— 免费档(Free Tier)就包含 FIFA 世界杯(WC)，
+//  且不像 API-Football 免费档那样把赛季锁在 2022–2024。免费档限速 10 次/分钟，
+//  配合下方 CDN 缓存(约 15 分钟)绰绰有余。
+//    注册拿 token：https://www.football-data.org/client/register
 //
-//  • 直连 api-sports.io：BASE_URL = https://v3.football.api-sports.io
-//    请求头用 { "x-apisports-key": <KEY> }
-//  • 若你用的是 RapidAPI 版：
-//      BASE_URL = https://api-football-v1.p.rapidapi.com/v3
-//      请求头 = { "x-rapidapi-key": <KEY>,
-//                "x-rapidapi-host": "api-football-v1.p.rapidapi.com" }
+//  （历史：本来用 API-Football(api-sports.io)，但其免费档报
+//    "Free plans do not have access to this season, try from 2022 to 2024."，
+//    拿不到 2026，故改用 football-data.org。）
 //
 //  世界杯参数：
-//    league = 1     // API-Football 里 "World Cup" 的联赛 id 固定为 1
-//    season = 2026  // 2026 美加墨世界杯
+//    competition = "WC"  // football-data.org 里 FIFA 世界杯的竞赛代码
+//    season      = 2026  // 2026 美加墨世界杯（按起始年份）
 //
-//  淘汰赛各 round 名称：
-//    用 GET /fixtures/rounds?league=1&season=2026 可列出本届所有 round。
-//    48 队赛制下，淘汰赛 round 形如：
-//      "Round of 32" / "Round of 16" / "Quarter-finals" /
-//      "Semi-finals" / "3rd Place Final" / "Final"
-//    小组赛 round 形如 "Group Stage - 1"，本函数只挑出下面 ROUND_TO_STAGE
-//    里列出的淘汰赛 round，其余(小组赛)自动忽略。
+//  淘汰赛各 stage 名称（football-data.org 的 match.stage 字段）：
+//    "LAST_32" / "LAST_16" / "QUARTER_FINALS" / "SEMI_FINALS" /
+//    "THIRD_PLACE" / "FINAL"；小组赛是 "GROUP_STAGE"。
+//    本函数只挑出下面 ROUND_TO_STAGE 里列出的淘汰赛 stage，其余自动忽略。
 // ----------------------------------------------------------------------------
 const API_CONFIG = {
-  BASE_URL: "https://v3.football.api-sports.io",
-  LEAGUE_ID: 1,
+  BASE_URL: "https://api.football-data.org/v4",
+  COMPETITION: "WC",
   SEASON: 2026,
   TIMEOUT_MS: 4000, // 服务端自身超时，留在前端 5s 之内
 
   // 拼请求头（密钥从环境变量取）
   headers() {
-    return {
-      "x-apisports-key": process.env.FOOTBALL_API_KEY || "",
-      // RapidAPI 版改用下面两行（并删掉上面那行）：
-      // "x-rapidapi-key": process.env.FOOTBALL_API_KEY || "",
-      // "x-rapidapi-host": "api-football-v1.p.rapidapi.com",
-    };
+    return { "X-Auth-Token": process.env.FOOTBALL_API_KEY || "" };
   },
 
-  // 一次取该联赛该赛季的全部赛程，本地再按 round 过滤淘汰赛（省请求次数）
+  // 一次取该竞赛该赛季的全部比赛，本地再按 stage 过滤淘汰赛（省请求次数）。
+  // 注：若该赛季尚未开放/报错，可去掉 ?season=2026 改用 currentSeason。
   fixturesUrl() {
-    return `${this.BASE_URL}/fixtures?league=${this.LEAGUE_ID}&season=${this.SEASON}`;
+    return `${this.BASE_URL}/competitions/${this.COMPETITION}/matches?season=${this.SEASON}`;
   },
 
-  // 上游 round 名称 → 前端使用的中文 stage（也是只保留淘汰赛的白名单）
+  // 上游 stage 名称 → 前端使用的中文 stage（也是只保留淘汰赛的白名单）
   ROUND_TO_STAGE: {
-    "Round of 32": "32强赛",
-    "Round of 16": "16强赛",
-    "Quarter-finals": "1/4决赛",
-    "Semi-finals": "半决赛",
-    "3rd Place Final": "季军赛",
-    "Play-off for 3rd place": "季军赛", // 个别源的别名，防御性兼容
-    "Final": "决赛",
+    "LAST_32": "32强赛",
+    "LAST_16": "16强赛",
+    "QUARTER_FINALS": "1/4决赛",
+    "SEMI_FINALS": "半决赛",
+    "THIRD_PLACE": "季军赛",
+    "FINAL": "决赛",
   },
 
-  // 字段映射：上游 fixture 对象 → 我们关心的字段。集中在此方便换源。
+  // 字段映射：上游 match 对象 → 我们关心的字段。集中在此方便换源。
   map: {
-    round: (fx) => fx && fx.league && fx.league.round,
-    timestamp: (fx) => (fx && fx.fixture && fx.fixture.timestamp) || 0,
-    homeName: (fx) => fx && fx.teams && fx.teams.home && fx.teams.home.name,
-    awayName: (fx) => fx && fx.teams && fx.teams.away && fx.teams.away.name,
+    round: (m) => m && m.stage,
+    timestamp: (m) => (m && m.utcDate ? Math.floor(Date.parse(m.utcDate) / 1000) : 0),
+    homeName: (m) => m && m.homeTeam && m.homeTeam.name,
+    awayName: (m) => m && m.awayTeam && m.awayTeam.name,
   },
 };
 // ────────────────────────────────────────────────────────────────────────────
@@ -151,16 +143,14 @@ async function fetchUpstream() {
       headers: API_CONFIG.headers(),
       signal: controller.signal,
     });
-    if (!resp.ok) throw new Error("上游 HTTP " + resp.status);
 
-    const data = await resp.json();
+    // football-data.org 出错时用 HTTP 状态码 + { message, errorCode }
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      throw new Error("上游 HTTP " + resp.status + (data && data.message ? "：" + data.message : ""));
+    }
 
-    // API-Football 把错误放在 data.errors（对象或数组），results=0
-    const errs = data && data.errors;
-    const hasErr = errs && (Array.isArray(errs) ? errs.length : Object.keys(errs).length);
-    if (hasErr) throw new Error("上游返回错误：" + JSON.stringify(errs));
-
-    const arr = (data && data.response) || [];
+    const arr = (data && data.matches) || [];
     if (!Array.isArray(arr) || arr.length === 0) throw new Error("上游无赛程数据");
     return arr;
   } finally {
