@@ -1,0 +1,15 @@
+# 依赖
+node_modules/
+
+# 环境变量 —— 含上游接口密钥，绝不提交
+.env
+.env.local
+.env.*.local
+
+# Vercel
+.vercel/
+
+# 系统 / 编辑器
+.DS_Store
+Thumbs.db
+*.log

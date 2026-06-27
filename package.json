@@ -1,0 +1,9 @@
+{
+  "name": "wk-calendar",
+  "version": "1.0.0",
+  "private": true,
+  "description": "观赛日历：小组赛+F1 本地静态数据，淘汰赛对阵经 /api/knockout 自动更新",
+  "engines": {
+    "node": "20.x"
+  }
+}
